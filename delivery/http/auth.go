@@ -2,47 +2,34 @@ package http
 
 import (
 	"belajar-go-rest-api/delivery/http/middleware"
-	"belajar-go-rest-api/entities"
-	"belajar-go-rest-api/service"
+	"belajar-go-rest-api/entity"
+	"fmt"
 
 	"github.com/gofiber/fiber/v2"
 )
 
-// AuthHandler controller
-type AuthHandler struct {
-	Service *service.Service
-}
-
-type user struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
 // NewAuthHandler func
-func NewAuthHandler(router fiber.Router, service *service.Service) (authHandler *AuthHandler) {
-	authHandler = &AuthHandler{
-		Service: service,
-	}
-
-	router.Post("/login", authHandler.Login)
-	router.Get("/info", middleware.Auth, authHandler.Info)
+func NewAuthHandler(delivery *Delivery) {
+	router := delivery.HTTP.Group("/auth")
+	router.Post("/login", delivery.Login)
+	router.Get("/info", delivery.Middlewares(middleware.AUTH), delivery.Info)
 
 	return
 }
 
 // Login func
-func (a AuthHandler) Login(c *fiber.Ctx) error {
-	userInput := &user{}
+func (delivery Delivery) Login(c *fiber.Ctx) error {
+	userInput := &entity.UserLoginDTO{}
 	if err := c.BodyParser(userInput); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(err)
 	}
 
-	user := &entities.User{
+	user := &entity.User{
 		Email:    userInput.Email,
 		Password: userInput.Password,
 	}
 
-	token, err := a.Service.Auth.Login(user)
+	token, err := delivery.Service.Auth.Login(user)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": err.Error(),
@@ -55,6 +42,8 @@ func (a AuthHandler) Login(c *fiber.Ctx) error {
 }
 
 // Info func
-func (a AuthHandler) Info(c *fiber.Ctx) error {
-	return c.SendString("not implemented yet")
+func (delivery Delivery) Info(c *fiber.Ctx) error {
+	claims := delivery.Service.JWT.GetClaims(c)
+	email := claims.User.Email
+	return c.SendString(fmt.Sprintf("welcome, %s", email))
 }
